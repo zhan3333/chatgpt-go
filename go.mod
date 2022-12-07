@@ -1,4 +1,4 @@
-module chatgpt-go
+module github.com/zhan3333/chatgpt-go
 
 go 1.19
 
