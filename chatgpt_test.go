@@ -1,9 +1,9 @@
 package chatgpt_go_test
 
 import (
-	chatgpt_go "chatgpt-go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	chatgpt_go "github.com/zhan3333/chatgpt-go"
 	"os"
 	"testing"
 	"time"
