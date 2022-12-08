@@ -56,6 +56,7 @@ type SessionResult struct {
 	} `json:"user"`
 	Expires     time.Time `json:"expires"`
 	AccessToken string    `json:"accessToken"`
+	Error       string    `json:"error"`
 }
 
 func (c *ChatGPT) IsAccessTokenExpired() bool {
@@ -71,25 +72,39 @@ func (c *ChatGPT) RefreshAccessToken() error {
 		req.Header.Set("cookie", fmt.Sprintf("__Secure-next-auth.session-token=%s", c.SessionToken))
 		req.Header.Set("user-agent", UserAgent)
 		resp, err := (&http.Client{Timeout: c.Timeout}).Do(req)
+
 		if err != nil {
+			if c.Log != nil {
+				c.Log.WithError(err).Debug("GET https://chat.openai.com/api/auth/session error")
+			}
 			return err
 		}
+
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read body: %w", err)
+		}
+
+		if c.Log != nil {
+			c.Log.WithFields(logrus.Fields{"status_code": resp.StatusCode, "body": string(b)}).Debug("GET https://chat.openai.com/api/auth/session success")
+		}
+
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("response status=%d not 200", resp.StatusCode)
 		}
-		b, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+
 		respJson := SessionResult{}
 		if err := json.Unmarshal(b, &respJson); err != nil {
-			return err
+			return fmt.Errorf("JSON %s format: %w", string(b), err)
 		}
 		if respJson.AccessToken == "" {
-			return fmt.Errorf("invalid resp: %s", string(b))
+			return fmt.Errorf("response not containes accessToken: %s", string(b))
 		}
-		c.AccessToken = respJson.AccessToken
+		if respJson.Error != "" {
+			return fmt.Errorf("response has error: %s", respJson.Error)
+		}
 		c.AccessTokenExpires = respJson.Expires
+		c.AccessToken = respJson.AccessToken
 	}
 	return nil
 }
@@ -173,7 +188,7 @@ func (c *Conversation) SendMessage(message string) (string, error) {
 		c.ParentMessageId = uuid.NewString()
 	}
 	if err := c.ChatGPT.RefreshAccessToken(); err != nil {
-		return "", err
+		return "", fmt.Errorf("refresh access token: %w", err)
 	}
 	body := ConversationBody{
 		Action: "next",
@@ -211,6 +226,11 @@ func (c *Conversation) SendMessage(message string) (string, error) {
 	resp, err := (&http.Client{Timeout: c.ChatGPT.Timeout}).Do(req)
 	if err != nil {
 		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("response status code=%d, body=%s", resp.StatusCode, string(body))
 	}
 
 	respMessage := ""

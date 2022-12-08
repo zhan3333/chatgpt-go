@@ -1,5 +1,11 @@
 # ChatGPT golang 接口对接
 
+## 特性
+
+- 支持会话
+- 支持消息上下文
+- 支持刷新 accessToken
+
 ## 运行测试
 
 1. 已经登录好的 ChatGPT 账号
@@ -30,7 +36,7 @@ import (
 )
 
 func main() {
-	timeout := time.Second * 30
+	timeout := time.Second * 60
 	client, err := chatgpt_go.NewChatGPT(os.Getenv("SESSION_KEY"), chatgpt_go.ChatGPTOptions{
 		Log:     logrus.NewEntry(logrus.StandardLogger()),
 		Timeout: &timeout,
@@ -45,6 +51,9 @@ func main() {
 	}
 	fmt.Println(resp)
 }
-
-
 ```
+
+## 注意
+
+- 据观察，accessToken 有效期在1年左右，sessionToken 有效期估计在一天左右，下一步会更新 accessToken 创建对象的方法
+- 据观察，消息短则数秒得到响应，长时会到分钟级，设置超时时间为 1分钟 比较稳妥

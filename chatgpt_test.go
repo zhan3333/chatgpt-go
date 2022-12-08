@@ -11,12 +11,16 @@ import (
 
 var sessionToken = os.Getenv("SESSION_KEY")
 
-func init() {
+func TestMain(m *testing.M) {
+	if sessionToken == "" {
+		panic("env SESSION_KEY not set")
+	}
 	logrus.SetLevel(logrus.DebugLevel)
+	m.Run()
 }
 
 func TestChatGPT_SendMessage(t *testing.T) {
-	timeout := time.Second * 30
+	timeout := time.Second * 60
 	client, err := chatgpt_go.NewChatGPT(sessionToken, chatgpt_go.ChatGPTOptions{
 		Log:     logrus.NewEntry(logrus.StandardLogger()),
 		Timeout: &timeout,
@@ -44,7 +48,9 @@ func TestChatGPT_SendMessage(t *testing.T) {
 }
 
 func TestChatGPT_RefreshAccessToken(t *testing.T) {
-	client, err := chatgpt_go.NewChatGPT(sessionToken, chatgpt_go.ChatGPTOptions{})
+	client, err := chatgpt_go.NewChatGPT(sessionToken, chatgpt_go.ChatGPTOptions{
+		Log: logrus.NewEntry(logrus.StandardLogger()),
+	})
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
