@@ -13,28 +13,34 @@ import (
 	"time"
 )
 
-const UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
-
 type ChatGPT struct {
 	SessionToken       string
+	ClearanceToken     string
 	AccessToken        string
 	AccessTokenExpires time.Time
 	Log                *logrus.Entry
 	Timeout            time.Duration
+	UserAgent          string
 }
 
 type ChatGPTOptions struct {
-	Log     *logrus.Entry
-	Timeout *time.Duration
+	SessionToken   string
+	ClearanceToken string
+	UserAgent      string
+	Log            *logrus.Entry
+	Timeout        *time.Duration
 }
 
-func NewChatGPT(sessionToken string, options ChatGPTOptions) (*ChatGPT, error) {
-	if sessionToken == "" {
-		return nil, fmt.Errorf("sessionToken must set")
+func NewChatGPT(options ChatGPTOptions) (*ChatGPT, error) {
+	if options.SessionToken == "" || options.ClearanceToken == "" || options.UserAgent == "" {
+		return nil, fmt.Errorf("sessionToken and clearanceToken and userAgent must set")
 	}
 	c := &ChatGPT{
-		SessionToken: sessionToken,
-		Log:          options.Log,
+		SessionToken:   options.SessionToken,
+		ClearanceToken: options.ClearanceToken,
+		UserAgent:      options.UserAgent,
+		Log:            options.Log,
+		Timeout:        0,
 	}
 	if options.Timeout != nil {
 		c.Timeout = *options.Timeout
@@ -69,8 +75,15 @@ func (c *ChatGPT) RefreshAccessToken() error {
 		if err != nil {
 			return err
 		}
-		req.Header.Set("cookie", fmt.Sprintf("__Secure-next-auth.session-token=%s", c.SessionToken))
-		req.Header.Set("user-agent", UserAgent)
+		req.Header.Set("cookie", fmt.Sprintf("cf_clearance=%s; __Secure-next-auth.session-token=%s", c.ClearanceToken, c.SessionToken))
+		req.Header.Set("user-agent", c.UserAgent)
+
+		// 额外的 header
+		req.Header.Set("x-openai-assistant-app-id", "")
+		req.Header.Set("accept-language", "en-US,en;q=0.9")
+		req.Header.Set("origin", "https://chat.openai.com")
+		req.Header.Set("referer", "https://chat.openai.com/chat")
+
 		resp, err := (&http.Client{Timeout: c.Timeout}).Do(req)
 
 		if err != nil {
@@ -222,7 +235,14 @@ func (c *Conversation) SendMessage(message string) (string, error) {
 	}
 	req.Header.Set("authorization", c.ChatGPT.AccessToken)
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("user-agent", UserAgent)
+	req.Header.Set("user-agent", c.ChatGPT.UserAgent)
+	req.Header.Set("accept", "text/event-stream")
+	req.Header.Set("cookie", fmt.Sprintf("cf_clearance=%s", c.ChatGPT.ClearanceToken))
+
+	req.Header.Set("x-openai-assistant-app-id", "")
+	req.Header.Set("accept-language", "en-US,en;q=0.9")
+	req.Header.Set("origin", "https://chat.openai.com")
+	req.Header.Set("referer", "https://chat.openai.com/chat")
 	resp, err := (&http.Client{Timeout: c.ChatGPT.Timeout}).Do(req)
 	if err != nil {
 		return "", err
