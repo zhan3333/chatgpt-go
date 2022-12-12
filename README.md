@@ -54,7 +54,7 @@ func main() {
 	var clearanceToken = os.Getenv("CLEARANCE_TOKEN")
 	var userAgent = os.Getenv("USER_AGENT")
 	timeout := time.Second * 60
-	client, err := chatgpt_go.NewChatGPT(os.Getenv("SESSION_KEY"), chatgpt_go.ChatGPTOptions{
+	client, err := chatgpt_go.NewChatGPT(chatgpt_go.ChatGPTOptions{
 		SessionToken:   sessionToken,
 		ClearanceToken: clearanceToken,
 		UserAgent:      userAgent,
